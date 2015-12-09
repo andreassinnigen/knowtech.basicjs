@@ -2,7 +2,7 @@
     <head>
         <link href='https://fonts.googleapis.com/css?family=Ubuntu:400,300,300italic,400italic,500,500italic,700,700italic' rel='stylesheet' type='text/css'>
         <link href="styles.css" rel="stylesheet" type="text/css">
-    	<script src="http://code.jquery.com/jquery-2.1.4.js"></script>
+        <script src="http://code.jquery.com/jquery-2.1.4.js"></script>
         <script src="/bower_components/knockout/dist/knockout.js"></script>
         <script src="/bower_components/moment/moment.js"></script>
         <script>
@@ -11,56 +11,49 @@
                 currentOrder: "desc",
                 posts: ko.observableArray(),
                 searchText: ko.observable(),
-
+                backgroundColor: ko.observable(),
+                postsBackup: null,
                 startEditingPost: function(post) {
                     post.editable(true);
-
+                },
                 stopEditingPost: function(post) {
                     post.editable(false);
-                }
-
-                reorder: function () {
+                },
+                reorder: function() {
                     if(this.currentOrder == "desc") {
                         this.posts.sort(function(previousPost, nextPost){
-                        if(previousPost.dateAdded < nextPost.dateAdded)
-                            return -1;
-                        else if(previousPost.dateAdded == nextPost.dateAdded)
-                            return 0;
-                        else
-                            return 1;
-                    });
-                        this.currentOrder ="asc";
+                            if(previousPost.dateAdded < nextPost.dateAdded)
+                                return -1;
+                            else if(previousPost.dateAdded == nextPost.dateAdded)
+                                return 0;
+                            else
+                                return 1;
+                        });
+                        this.currentOrder = "asc";
                         this.reorderButtonText("Sort by ascending");
-                     }   else if(this.currentOrder == "asc") {
+                    } else if(this.currentOrder == "asc") {
                         this.posts.sort(function(previousPost, nextPost){
-                        if(previousPost.dateAdded > nextPost.dateAdded)
-                            return -1;
-                        else if(previousPost.dateAdded == nextPost.dateAdded)
-                            return 0;
-                        else
-                            return 1;
-                    });
-                        this.currentOrder ="desc";
+                            if(previousPost.dateAdded > nextPost.dateAdded)
+                                return -1;
+                            else if(previousPost.dateAdded == nextPost.dateAdded)
+                                return 0;
+                            else
+                                return 1;
+                        });
+                        this.currentOrder = "desc";
                         this.reorderButtonText("Sort by descending");
-                     }
-                    },
-
+                    }
+                },
                 drop: function() {
-                    debugger;
                     model.posts.splice(model.posts.indexOf(this), 1);
-                }
-            };
-
-            model.searchText.subscribe(function (){
-                var result = model.postsBackup.filter(function(post){
-                    return post.title.toLowerCase().indexOf(model.searchText().toLowerCase()) > -1;
-                });
-
-                model.posts(result);
-            });
-
-            document.addEventListener("DOMContentLoaded", function() {
-                $.getJSON("/posts.json").done(function(posts) {
+                },
+                loadPosts: function(posts) {
+                    if(typeof posts == "undefined") {
+                        console.log("hey");
+                        posts = JSON.parse(localStorage.getItem("latestposts"));
+                    } else {
+                        localStorage.setItem("latestposts", JSON.stringify(posts));
+                    }
                     model.postsBackup = posts;
                     posts.sort(function(previousPost, nextPost){
                         if(previousPost.dateAdded > nextPost.dateAdded)
@@ -70,17 +63,38 @@
                         else
                             return 1;
                     });
-
                     posts.forEach(function(post) {
                         post.editable = ko.observable(false);
+                        post.body = ko.observable(post.body);
                         model.posts.push(post);
                     });
+                }
+            };
+            model.backgroundColor.subscribe(function() {
+                document.body.style.background = "none";
+                document.body.style.backgroundColor = model.backgroundColor();
+                localStorage.setItem("backgroundColor", model.backgroundColor());
+            });
+            model.searchText.subscribe(function() {
+                var result = model.postsBackup.filter(function(post) {
+                    return post.title.toLowerCase().indexOf(model.searchText().toLowerCase()) > -1;
                 });
-
+                model.posts(result);
+            });
+            document.addEventListener("DOMContentLoaded", function() {
+                if(localStorage.getItem("latestposts") == null) {
+                    console.log("nooooooooooooooo");
+                    $.getJSON("/posts.json").done(function(posts) {
+                        model.loadPosts(posts);
+                    });
+                } else {
+                    model.loadPosts();
+                }
+                if(localStorage.getItem("backgroundColor") != null) {
+                    model.backgroundColor(localStorage.getItem("backgroundColor"));
+                }
                 ko.applyBindings(model, document.getElementById("app"));
             });
-
-
         </script>
     </head>
     <body>
@@ -88,25 +102,26 @@
             <header><h1>Blog</h1></header>
             <section>
                 <span>This blog has </span><span data-bind="text: posts().length"></span><span> posts</span>
-                <button data-bind="click: reorder, text:reorderButtonText"></button>
-                <input type="text" placeholder="Search here" data-bind="value: searchText, valueUpdate:'keyup'">
+                <button data-bind="click: reorder, text: reorderButtonText"></button>
+                <input type="text" placeholder="Search here" data-bind="value: searchText, valueUpdate: 'keyup'">
+                <input type="text" placeholder="Background color" data-bind="value: backgroundColor, valueUpdate: 'keyup'">
             </section>
             <section id="blogPosts" data-bind="foreach: posts">
                 <article id="blogPostTemplate">
                     <button data-bind="click: $root.drop">Drop</button>
-                	<h2 data-bind="text: title"></h2>
-                	<aside>
-                		<span class="blog-post-author" data-bind="text: author"></span>
+                    <h2 data-bind="text: title"></h2>
+                    <aside>
+                        <span class="blog-post-author" data-bind="text: author"></span>
                         <div class="blog-post-rating" data-bind="foreach: new Array(stars)">
                             <img src="/images/star-icon.png">
                         </div>
                         <div class="blog-post-dateadded">
-                        <span>Added on: </span><span data-bind="text: moment(dateAdded).fromNow()"></span>
+                            <span>Added on: </span><span data-bind="text: moment(dateAdded).format('D/M/YYYY HH:mm:ss')"></span>
                         </div>
-                	</aside>
-                	<section class="blog-post-body" data-bind="css: { 'read-only': !editable}, text: body, click: function() {$root.startEditingPost(this) }"></section>
+                    </aside>
+                    <section class="blog-post-body" data-bind="css: { 'read-only': !editable() }, text: body, click: function() { $root.startEditingPost(this) }"></section>
 
-                    <textarea class="blog-post-body" data-bind='value: body, css: {'editable': editable }, click: function() {$root.stopEditingPost(this) }"></textarea>
+                    <textarea class="blog-post-body" data-bind="value: body, css: { editable: editable() }, event: { blur: function() { $root.stopEditingPost(this) } }, valueUpdate: 'keyup'"></texarea>
 
                     <section class="blog-post-comments" data-bind="foreach: comments">
                         <div data-bind="text: text"></div>
@@ -117,3 +132,5 @@
         </div>
     </body>
 </html>
+Status API Training Shop Blog About Pricing
+© 2015 GitHub, Inc. Terms Privacy Security Contact Help
